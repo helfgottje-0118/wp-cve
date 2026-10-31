@@ -1,7 +1,7 @@
 #!/bin/bash
 # WordPress enumeration script
 
-TARGET=${1:-http://localhost:18180}
+TARGET=${1:-http://192.168.4.36:18180}
 
 echo "[*] Enumerating WordPress at $TARGET"
 echo
