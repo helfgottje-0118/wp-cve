@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 
-URL="${WP_URL:-http://192.168.4.36:18080}"
+URL="${WP_URL:-http://192.168.4.36:18180}"
 ADMIN_USER="${WP_ADMIN_USER:-admin}"
 ADMIN_PASS="${WP_ADMIN_PASS:-AdminPass123!}"
 ADMIN_EMAIL="${WP_ADMIN_EMAIL:-admin@lab.local}"
