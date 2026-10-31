@@ -2,7 +2,7 @@
 # Health / version check for the WordPress 5.0.0 CVE-2019-8942 lab.
 set -uo pipefail
 
-BASE="${WP_URL:-http://localhost:12345}"
+BASE="${WP_URL:-http://localhost:18080}"
 fail=0
 
 pass() { printf '  [PASS] %s\n' "$1"; }
